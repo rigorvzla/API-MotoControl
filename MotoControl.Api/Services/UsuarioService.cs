@@ -10,11 +10,13 @@ public sealed class UsuarioService
 {
     private readonly Db _db;
     private readonly JwtService _jwt;
+    private readonly Clock _clock;
 
-    public UsuarioService(Db db, JwtService jwt)
+    public UsuarioService(Db db, JwtService jwt, Clock clock)
     {
         _db = db;
         _jwt = jwt;
+        _clock = clock;
     }
 
     public JwtService Jwt => _jwt;
@@ -31,6 +33,15 @@ public sealed class UsuarioService
 
         if (u is null || !u.Activo) return null;
         if (!BCrypt.Net.BCrypt.Verify(password, u.PasswordHash)) return null;
+
+        // Control del tiempo de uso contratado (solo aplica a gestores).
+        if (u.AccesoHasta is not null && u.AccesoHasta.Value <= DateTime.UtcNow)
+        {
+            var vence = _clock.ToLocal(u.AccesoHasta.Value);
+            throw new UnauthorizedAccessException(
+                $"Tu tiempo de uso del sistema venció el {vence:dd/MM/yyyy}. " +
+                "Contacta al administrador para renovarlo.");
+        }
 
         var asociacion = u.AsociacionId is null ? null : await CargarAsociacionAsync(cn, u.AsociacionId.Value);
         return (_jwt.Crear(u, asociacion), ToDto(u, asociacion));
@@ -88,7 +99,7 @@ public sealed class UsuarioService
             f.Id, f.Usuario, f.Nombre, f.Email, f.Rol, f.Activo,
             f.AsociacionId, f.AsociacionNombre,
             ImageUtil.ToDataUrl(f.AsociacionLogo, f.AsociacionLogoContentType),
-            f.AsociacionCuota, f.AsociacionMoneda)).ToList();
+            f.AsociacionCuota, f.AsociacionMoneda, f.AccesoHasta)).ToList();
     }
 
     public async Task<UsuarioDto> CrearUsuarioAsync(UsuarioCreateRequest r)
@@ -137,6 +148,10 @@ public sealed class UsuarioService
             asociacionId = null; // el admin es global
         }
 
+        var accesoHasta = r.Rol == Roles.Gestor && r.DiasAcceso is > 0
+            ? DateTime.UtcNow.AddDays(r.DiasAcceso.Value)
+            : (DateTime?)null;
+
         var u = new UsuarioEntity
         {
             Id = Guid.NewGuid(),
@@ -146,16 +161,17 @@ public sealed class UsuarioService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(r.Password),
             Rol = r.Rol,
             AsociacionId = asociacionId,
-            Activo = true
+            Activo = true,
+            AccesoHasta = accesoHasta
         };
 
         try
         {
             await cn.ExecuteAsync(@"
                 INSERT INTO usuarios (id, usuario, nombre, email, password_hash, rol,
-                                      asociacion_id, activo, creado_en)
+                                      asociacion_id, activo, creado_en, acceso_hasta)
                 VALUES (@Id, @Usuario, @Nombre, @Email, @PasswordHash, @Rol,
-                        @AsociacionId, true, now());", u);
+                        @AsociacionId, true, now(), @AccesoHasta);", u);
         }
         catch (PostgresException ex) when (ex.SqlState == "23505")
         {
@@ -203,6 +219,17 @@ public sealed class UsuarioService
         if (!string.IsNullOrWhiteSpace(r.Password) && r.Password.Length < 6)
             throw new ArgumentException("La contraseña debe tener al menos 6 caracteres.");
 
+        // null = conservar el vencimiento actual; 0 = sin límite; > 0 = días desde hoy.
+        var accesoHasta = r.Rol == Roles.Admin
+            ? null
+            : r.DiasAcceso switch
+            {
+                null => actual.AccesoHasta,
+                0 => null,
+                > 0 => DateTime.UtcNow.AddDays(r.DiasAcceso.Value),
+                _ => actual.AccesoHasta
+            };
+
         await cn.ExecuteAsync(@"
             UPDATE usuarios SET
                 nombre = @Nombre,
@@ -210,7 +237,8 @@ public sealed class UsuarioService
                 rol = @Rol,
                 asociacion_id = @AsociacionId,
                 activo = @Activo,
-                password_hash = @Hash
+                password_hash = @Hash,
+                acceso_hasta = @AccesoHasta
             WHERE id = @Id;",
             new
             {
@@ -220,7 +248,8 @@ public sealed class UsuarioService
                 r.Rol,
                 AsociacionId = asociacionId,
                 r.Activo,
-                Hash = hash
+                Hash = hash,
+                AccesoHasta = accesoHasta
             });
 
         if (asociacionId is not null && !string.IsNullOrWhiteSpace(r.LogoDataUrl))
@@ -428,7 +457,7 @@ public sealed class UsuarioService
         u.Id, u.Usuario, u.Nombre, u.Email, u.Rol, u.Activo,
         u.AsociacionId, a?.Nombre,
         ImageUtil.ToDataUrl(a?.Logo, a?.LogoContentType),
-        a?.Cuota, a?.Moneda);
+        a?.Cuota, a?.Moneda, u.AccesoHasta);
 
     private static AsociacionDto ToAsociacionDto(AsociacionFila a) => new(
         a.Id, a.Nombre, a.Cuota, a.Moneda,

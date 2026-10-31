@@ -24,6 +24,7 @@ public class UsuarioEntity
     public Guid? AsociacionId { get; set; }
     public bool Activo { get; set; } = true;
     public DateTime CreadoEn { get; set; }
+    public DateTime? AccesoHasta { get; set; }
 }
 
 public class Socio

@@ -24,7 +24,8 @@ public record UsuarioDto(
     string? AsociacionNombre,
     string? LogoDataUrl,
     decimal? Cuota,
-    string? Moneda);
+    string? Moneda,
+    DateTime? AccesoHasta);
 
 public record LoginResponse(string Token, UsuarioDto Usuario);
 
@@ -38,7 +39,8 @@ public record UsuarioCreateRequest(
     string? NombreAsociacion,
     decimal? Cuota,
     string? Moneda,
-    string? LogoDataUrl);
+    string? LogoDataUrl,
+    int? DiasAcceso);
 
 public record UsuarioUpdateRequest(
     string Nombre,
@@ -48,7 +50,8 @@ public record UsuarioUpdateRequest(
     string? NombreAsociacion,
     bool Activo,
     string? Password,
-    string? LogoDataUrl);
+    string? LogoDataUrl,
+    int? DiasAcceso);
 
 // ─────────────────────────────────────────────────────────────
 //  Asociación / configuración

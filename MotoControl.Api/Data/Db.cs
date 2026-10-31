@@ -144,6 +144,9 @@ public sealed class Db
             creado_en     TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 
+        -- Fecha límite de uso para gestores (NULL = sin límite).
+        ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS acceso_hasta TIMESTAMPTZ;
+
         CREATE TABLE IF NOT EXISTS socios (
             id               UUID PRIMARY KEY,
             asociacion_id    UUID NOT NULL REFERENCES asociaciones(id) ON DELETE CASCADE,
