@@ -72,6 +72,17 @@ public record AsociacionRequest(
     string Moneda,
     string? LogoDataUrl);
 
+/// <summary>Resumen de lo que se borraría al eliminar una asociación por completo.</summary>
+public record ImpactoAsociacionDto(
+    Guid Id,
+    string Nombre,
+    int Socios,
+    int Pagos,
+    int Recaudos,
+    int Usuarios);
+
+public record PurgaAsociacionRequest(string Confirmacion);
+
 public record ConfiguracionDto(string Nombre, decimal Cuota, string Moneda, string? LogoDataUrl);
 
 public record ConfiguracionRequest(string Nombre, decimal Cuota, string Moneda);

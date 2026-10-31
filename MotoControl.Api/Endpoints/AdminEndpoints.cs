@@ -47,6 +47,14 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // Eliminación total: asociación + socios + pagos + recaudos + gestores.
+        grupo.MapGet("/asociaciones/{id:guid}/impacto", async (Guid id, UsuarioService usuarios) =>
+            Results.Ok(await usuarios.ImpactoAsociacionAsync(id)));
+
+        grupo.MapPost("/asociaciones/{id:guid}/purgar", async (
+            Guid id, PurgaAsociacionRequest req, UsuarioService usuarios) =>
+            Results.Ok(await usuarios.EliminarAsociacionCompletaAsync(id, req.Confirmacion)));
+
         // ── Resumen global ────────────────────────────────────────
         grupo.MapGet("/resumen", async (UsuarioService usuarios) =>
         {

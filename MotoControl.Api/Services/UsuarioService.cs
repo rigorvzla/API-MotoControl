@@ -365,6 +365,59 @@ public sealed class UsuarioService
         await cn.ExecuteAsync("DELETE FROM asociaciones WHERE id = @id;", new { id });
     }
 
+    /// <summary>Cuenta lo que se borraría si se elimina la asociación por completo.</summary>
+    public async Task<ImpactoAsociacionDto> ImpactoAsociacionAsync(Guid id)
+    {
+        await using var cn = await _db.OpenAsync();
+
+        var a = await cn.QuerySingleOrDefaultAsync<Asociacion>(
+            "SELECT * FROM asociaciones WHERE id = @id;", new { id })
+            ?? throw new KeyNotFoundException("Asociación no encontrada.");
+
+        return new ImpactoAsociacionDto(
+            a.Id, a.Nombre,
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM socios WHERE asociacion_id = @id;", new { id }),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM pagos WHERE asociacion_id = @id;", new { id }),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM recaudos WHERE asociacion_id = @id;", new { id }),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM usuarios WHERE asociacion_id = @id;", new { id }));
+    }
+
+    /// <summary>
+    /// Elimina la asociación y TODO su contenido: socios (con motos y avances),
+    /// pagos, recaudos y usuarios gestores. Es irreversible.
+    /// Exige escribir el nombre exacto de la asociación como confirmación.
+    /// </summary>
+    public async Task<ImpactoAsociacionDto> EliminarAsociacionCompletaAsync(Guid id, string confirmacion)
+    {
+        await using var cn = await _db.OpenAsync();
+        await using var tx = await cn.BeginTransactionAsync();
+
+        var a = await cn.QuerySingleOrDefaultAsync<Asociacion>(
+            "SELECT * FROM asociaciones WHERE id = @id;", new { id }, tx)
+            ?? throw new KeyNotFoundException("Asociación no encontrada.");
+
+        if (!string.Equals((confirmacion ?? string.Empty).Trim(), a.Nombre.Trim(),
+                           StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "El nombre escrito no coincide con el de la asociación. No se eliminó nada.");
+
+        var impacto = new ImpactoAsociacionDto(
+            a.Id, a.Nombre,
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM socios WHERE asociacion_id = @id;", new { id }, tx),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM pagos WHERE asociacion_id = @id;", new { id }, tx),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM recaudos WHERE asociacion_id = @id;", new { id }, tx),
+            await cn.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM usuarios WHERE asociacion_id = @id;", new { id }, tx));
+
+        await cn.ExecuteAsync("DELETE FROM pagos WHERE asociacion_id = @id;", new { id }, tx);
+        await cn.ExecuteAsync("DELETE FROM recaudos WHERE asociacion_id = @id;", new { id }, tx);
+        await cn.ExecuteAsync("DELETE FROM socios WHERE asociacion_id = @id;", new { id }, tx);
+        await cn.ExecuteAsync("DELETE FROM usuarios WHERE asociacion_id = @id;", new { id }, tx);
+        await cn.ExecuteAsync("DELETE FROM asociaciones WHERE id = @id;", new { id }, tx);
+
+        await tx.CommitAsync();
+        return impacto;
+    }
+
     public async Task<ConfiguracionDto> ConfiguracionAsync(Guid asociacionId)
     {
         var a = await AsociacionEntidadAsync(asociacionId);
