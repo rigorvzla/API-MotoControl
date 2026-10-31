@@ -428,7 +428,7 @@ public sealed class ReporteService
 
                     if (items.Count == 0)
                     {
-                        col.Item().Text("🎉 No hay socios con cuotas atrasadas.")
+                        col.Item().Text("No hay socios con cuotas atrasadas.")
                             .FontSize(12).FontColor(Colors.Green.Darken3);
                     }
                     else
@@ -604,7 +604,7 @@ public sealed class ReporteService
 
                     if (data.Morosos.Count == 0)
                     {
-                        col.Item().Text("🎉 No hay socios con cuotas atrasadas.")
+                        col.Item().Text("No hay socios con cuotas atrasadas.")
                             .FontColor(Colors.Green.Darken3);
                     }
                     else

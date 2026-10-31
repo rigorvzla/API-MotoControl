@@ -27,7 +27,7 @@ public sealed class UsuarioService
         await using var cn = await _db.OpenAsync();
 
         var u = await cn.QuerySingleOrDefaultAsync<UsuarioEntity>(
-            "SELECT * FROM usuarios WHERE usuario = @usuario;", new { usuario });
+            "SELECT * FROM usuarios WHERE lower(usuario) = lower(@usuario);", new { usuario });
 
         if (u is null || !u.Activo) return null;
         if (!BCrypt.Net.BCrypt.Verify(password, u.PasswordHash)) return null;
@@ -96,6 +96,13 @@ public sealed class UsuarioService
         ValidarUsuario(r.Usuario, r.Password, r.Rol);
 
         await using var cn = await _db.OpenAsync();
+
+        // El usuario es único sin distinguir mayúsculas/minúsculas.
+        var yaExiste = await cn.ExecuteScalarAsync<int>(
+            "SELECT COUNT(1) FROM usuarios WHERE lower(usuario) = lower(@usuario);",
+            new { usuario = r.Usuario.Trim() });
+        if (yaExiste > 0)
+            throw new InvalidOperationException($"Ya existe el usuario '{r.Usuario.Trim()}'.");
 
         Guid? asociacionId = r.AsociacionId;
 
@@ -352,12 +359,11 @@ public sealed class UsuarioService
 
         await using var cn = await _db.OpenAsync();
         await cn.ExecuteAsync(@"
-            UPDATE asociaciones SET nombre = @Nombre, cuota = @Cuota, moneda = @Moneda
+            UPDATE asociaciones SET cuota = @Cuota, moneda = @Moneda
             WHERE id = @Id;",
             new
             {
                 Id = asociacionId,
-                Nombre = r.Nombre.Trim(),
                 Cuota = r.Cuota < 0 ? 0 : r.Cuota,
                 Moneda = string.IsNullOrWhiteSpace(r.Moneda) ? "$" : r.Moneda.Trim()
             });

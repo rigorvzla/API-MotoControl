@@ -13,6 +13,10 @@ var builder = WebApplication.CreateBuilder(args);
 // QuestPDF: licencia comunitaria (igual que la app de escritorio).
 QuestPDF.Settings.License = LicenseType.Community;
 
+// Los nombres o textos pueden traer emojis que la fuente Lato no incluye.
+// Sin esto, QuestPDF 2026.9 lanza una excepción y el reporte devuelve 500.
+QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
+
 // ─────────────────────────────────────────────────────────────
 //  Servicios
 // ─────────────────────────────────────────────────────────────
