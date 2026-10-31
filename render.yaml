@@ -1,0 +1,43 @@
+# Blueprint de Render para la API de Moto Control.
+#
+# Uso: Render -> New -> Blueprint -> seleccionar este repositorio -> Apply.
+# Render pedira los valores marcados con "sync: false".
+# Despues puedes cambiar cualquiera en Settings -> Environment.
+
+services:
+  - type: web
+    name: motocontrolweb
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Cadena de CockroachDB Cloud.
+      # Ejemplo:
+      # Host=...cockroachlabs.cloud;Port=26257;Username=...;Database=MotoControlSystem;SSL Mode=VerifyFull;Password=...
+      - key: ConnectionStrings__Cockroach
+        sync: false
+
+      # Render genera una clave aleatoria y estable para firmar los JWT.
+      - key: Jwt__Key
+        generateValue: true
+
+      # Origen exacto del frontend (sin barra final, sin ruta).
+      - key: Cors__AllowedOrigins__0
+        value: https://rigorvzla.github.io
+
+      # Administrador inicial: se crea solo si la tabla usuarios
+      # no tiene ningun usuario con rol 'admin'.
+      - key: Seed__AdminUser
+        sync: false
+      - key: Seed__AdminPassword
+        sync: false
+
+      - key: App__TimeZone
+        value: America/Caracas
