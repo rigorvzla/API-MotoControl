@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -19,7 +20,7 @@ public sealed class JwtService
             ?? throw new InvalidOperationException("Falta 'Jwt:Key' en la configuración.");
         _issuer = configuration["Jwt:Issuer"] ?? "MotoControl";
         _audience = configuration["Jwt:Audience"] ?? "MotoControl.Web";
-        _horas = int.TryParse(configuration["Jwt:Hours"], out var h) ? h : 12;
+        _horas = int.TryParse(configuration["Jwt:Hours"], out var h) ? h : 4;
 
         if (Encoding.UTF8.GetByteCount(_key) < 32)
             throw new InvalidOperationException("'Jwt:Key' debe tener al menos 32 caracteres.");
@@ -34,7 +35,9 @@ public sealed class JwtService
             new(ClaimTypes.Role, usuario.Rol),
             new("nombre", usuario.Nombre),
             new("tenant", usuario.AsociacionId?.ToString() ?? string.Empty),
-            new("tenantName", asociacion?.Nombre ?? string.Empty)
+            new("tenantName", asociacion?.Nombre ?? string.Empty),
+            new("accesoHasta",
+                usuario.AccesoHasta?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty)
         };
 
         var credenciales = new SigningCredentials(

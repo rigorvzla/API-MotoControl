@@ -52,8 +52,19 @@ public static class AdminEndpoints
             Results.Ok(await usuarios.ImpactoAsociacionAsync(id)));
 
         grupo.MapPost("/asociaciones/{id:guid}/purgar", async (
-            Guid id, PurgaAsociacionRequest req, UsuarioService usuarios) =>
-            Results.Ok(await usuarios.EliminarAsociacionCompletaAsync(id, req.Confirmacion)));
+            Guid id, PurgaAsociacionRequest req, ClaimsPrincipal user,
+            ILogger<Program> log, UsuarioService usuarios) =>
+        {
+            var resultado = await usuarios.EliminarAsociacionCompletaAsync(id, req.Confirmacion);
+
+            log.LogWarning(
+                "Eliminación total de la asociación '{Nombre}' ({Id}) por el usuario {Actor}. " +
+                "Socios: {Socios}, pagos: {Pagos}, recaudos: {Recaudos}, usuarios: {Usuarios}",
+                resultado.Nombre, resultado.Id, user.GetUserId(),
+                resultado.Socios, resultado.Pagos, resultado.Recaudos, resultado.Usuarios);
+
+            return Results.Ok(resultado);
+        });
 
         // ── Resumen global ────────────────────────────────────────
         grupo.MapGet("/resumen", async (UsuarioService usuarios) =>

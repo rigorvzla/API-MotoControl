@@ -12,6 +12,11 @@ public sealed class UsuarioService
     private readonly JwtService _jwt;
     private readonly Clock _clock;
 
+    // Hash de relleno: iguala el tiempo de respuesta cuando el usuario no existe
+    // y evita que se puedan enumerar cuentas por el tiempo de respuesta.
+    private static readonly string DummyHash =
+        BCrypt.Net.BCrypt.HashPassword("motocontrol-usuario-inexistente");
+
     public UsuarioService(Db db, JwtService jwt, Clock clock)
     {
         _db = db;
@@ -31,7 +36,13 @@ public sealed class UsuarioService
         var u = await cn.QuerySingleOrDefaultAsync<UsuarioEntity>(
             "SELECT * FROM usuarios WHERE lower(usuario) = lower(@usuario);", new { usuario });
 
-        if (u is null || !u.Activo) return null;
+        if (u is null)
+        {
+            BCrypt.Net.BCrypt.Verify(password, DummyHash);
+            return null;
+        }
+
+        if (!u.Activo) return null;
         if (!BCrypt.Net.BCrypt.Verify(password, u.PasswordHash)) return null;
 
         // Control del tiempo de uso contratado (solo aplica a gestores).
@@ -67,8 +78,8 @@ public sealed class UsuarioService
 
     public async Task CambiarPasswordAsync(Guid id, string actual, string nueva)
     {
-        if (string.IsNullOrWhiteSpace(nueva) || nueva.Length < 6)
-            throw new ArgumentException("La nueva contraseña debe tener al menos 6 caracteres.");
+        if (string.IsNullOrWhiteSpace(nueva) || nueva.Length < 8)
+            throw new ArgumentException("La nueva contraseña debe tener al menos 8 caracteres.");
 
         await using var cn = await _db.OpenAsync();
         var u = await cn.QuerySingleOrDefaultAsync<UsuarioEntity>(
@@ -216,8 +227,8 @@ public sealed class UsuarioService
             ? actual.PasswordHash
             : BCrypt.Net.BCrypt.HashPassword(r.Password);
 
-        if (!string.IsNullOrWhiteSpace(r.Password) && r.Password.Length < 6)
-            throw new ArgumentException("La contraseña debe tener al menos 6 caracteres.");
+        if (!string.IsNullOrWhiteSpace(r.Password) && r.Password.Length < 8)
+            throw new ArgumentException("La contraseña debe tener al menos 8 caracteres.");
 
         // null = conservar el vencimiento actual; 0 = sin límite; > 0 = días desde hoy.
         var accesoHasta = r.Rol == Roles.Admin
@@ -295,8 +306,8 @@ public sealed class UsuarioService
     {
         if (string.IsNullOrWhiteSpace(usuario) || usuario.Trim().Length < 3)
             throw new ArgumentException("El usuario debe tener al menos 3 caracteres.");
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
-            throw new ArgumentException("La contraseña debe tener al menos 6 caracteres.");
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+            throw new ArgumentException("La contraseña debe tener al menos 8 caracteres.");
         if (rol is not (Roles.Admin or Roles.Gestor))
             throw new ArgumentException("El rol debe ser 'admin' o 'gestor'.");
     }

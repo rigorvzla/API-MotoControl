@@ -19,7 +19,7 @@ public static class AuthEndpoints
             return resultado is null
                 ? Results.Json(new { error = "Usuario o contraseña incorrectos." }, statusCode: 401)
                 : Results.Ok(new LoginResponse(resultado.Value.Token, resultado.Value.Usuario));
-        }).AllowAnonymous();
+        }).AllowAnonymous().RequireRateLimiting("login");
 
         grupo.MapGet("/me", async (ClaimsPrincipal user, UsuarioService usuarios) =>
         {
