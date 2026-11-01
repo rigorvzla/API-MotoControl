@@ -27,6 +27,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddSingleton<Clock>();
 builder.Services.AddSingleton<Db>();
 builder.Services.AddSingleton<JwtService>();
+builder.Services.AddSingleton<LoginThrottle>();
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<PagoService>();
 builder.Services.AddScoped<SocioService>();

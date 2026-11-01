@@ -10,15 +10,26 @@ public static class AuthEndpoints
     {
         var grupo = app.MapGroup("/api/auth").WithTags("Autenticación");
 
-        grupo.MapPost("/login", async (LoginRequest req, UsuarioService usuarios) =>
+        grupo.MapPost("/login", async (LoginRequest req, UsuarioService usuarios, LoginThrottle throttle) =>
         {
             if (string.IsNullOrWhiteSpace(req.Usuario) || string.IsNullOrWhiteSpace(req.Password))
                 return Results.BadRequest(new { error = "Usuario y contraseña son obligatorios." });
 
+            if (throttle.Bloqueado(req.Usuario))
+                return Results.Json(new
+                {
+                    error = "Demasiados intentos de inicio de sesión. Espera unos minutos e intenta de nuevo."
+                }, statusCode: 429);
+
             var resultado = await usuarios.LoginAsync(req.Usuario.Trim(), req.Password);
-            return resultado is null
-                ? Results.Json(new { error = "Usuario o contraseña incorrectos." }, statusCode: 401)
-                : Results.Ok(new LoginResponse(resultado.Value.Token, resultado.Value.Usuario));
+            if (resultado is null)
+            {
+                throttle.Fallo(req.Usuario);
+                return Results.Json(new { error = "Usuario o contraseña incorrectos." }, statusCode: 401);
+            }
+
+            throttle.Exito(req.Usuario);
+            return Results.Ok(new LoginResponse(resultado.Value.Token, resultado.Value.Usuario));
         }).AllowAnonymous().RequireRateLimiting("login");
 
         grupo.MapGet("/me", async (ClaimsPrincipal user, UsuarioService usuarios) =>
